@@ -1,5 +1,6 @@
 ---
 title: Spinach Leaf Classification
+
 emoji: 🌿
 colorFrom: green
 colorTo: blue
@@ -24,3 +25,20 @@ MobileNetV2-based binary classifier — Big leaf vs Small leaf.
 pip install -r requirements.txt
 python app.py
 ```
+
+## Dataset Download
+
+The complete Spinach Leaf Classification dataset is available on Google Drive.
+
+**[Download Dataset – Google Drive](https://drive.google.com/drive/folders/1prjz5-J3Nbj9h4TXb427Xe83CRALaQlN?usp=drive_link)**
+
+### Dataset Classes
+- Big Leaf
+- Small Leaf
+
+### Dataset Structure
+- Training
+- Validation
+- Testing
+
+The dataset is provided separately to avoid large files in the GitHub repository.
