@@ -1,186 +1,84 @@
-"""
-Spinach Leaf Classifier — Gradio App
-Model  : MobileNetV2
-Classes: BIG LEAF / SMALL LEAF
-
-Run:
-    pip install gradio torch torchvision pillow
-    python gradio_spinach_app.py
-
-A public link (valid 72 hours) is printed in the terminal.
-Anyone can open it on phone or PC — no installation needed.
-"""
-
-import torch
-import torch.nn as nn
-import gradio as gr
-
+"""Spinach Leaf Classifier — Gradio App"""
+import os
 from pathlib import Path
-from torchvision import models, transforms
+
+import gradio as gr
+import torch
+import torchvision.transforms as transforms
 from PIL import Image
+from torchvision import models
 
-# ── CONFIGURATION ────────────────────────────────────────────
-MODEL_PATH = Path(r"D:\Spinach_Leaf_Classification\models\mobilenet_best.pth")
-DEVICE     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-IMG_SIZE   = 224
+# ── Model resolution ──────────────────────────────────────────────────────────
+def resolve_model_path() -> Path:
+    env = os.environ.get("MODEL_PATH")
+    if env and Path(env).exists():
+        return Path(env)
+    relative = Path(__file__).parent.parent / "models" / "mobilenet_best.pth"
+    if relative.exists():
+        return relative
+    try:
+        from huggingface_hub import hf_hub_download
+        p = hf_hub_download(
+            repo_id="hemanthkumar0406/spinach-leaf-mobilenetv2",
+            filename="mobilenet_best.pth",
+        )
+        return Path(p)
+    except Exception as e:
+        raise FileNotFoundError(f"Model not found: {e}")
 
-# ── BUILD MOBILENETV2 ARCHITECTURE ──────────────────────────
-# Must match exactly what was used during training
-def build_model():
+# ── Build model ───────────────────────────────────────────────────────────────
+def build_model(path: Path) -> torch.nn.Module:
     model = models.mobilenet_v2(weights=None)
-    in_features = model.classifier[1].in_features
-    model.classifier = nn.Sequential(
-        nn.Dropout(0.3),
-        nn.Linear(in_features, 256),
-        nn.ReLU(),
-        nn.Dropout(0.3),
-        nn.Linear(256, 1)   # single logit → BCEWithLogitsLoss
+    model.classifier = torch.nn.Sequential(
+        torch.nn.Dropout(0.2),
+        torch.nn.Linear(1280, 256),
+        torch.nn.ReLU(),
+        torch.nn.Linear(256, 1),
     )
+    state = torch.load(path, map_location="cpu")
+    model.load_state_dict(state)
+    model.eval()
     return model
 
-# ── LOAD SAVED WEIGHTS ───────────────────────────────────────
-model = build_model()
-model.load_state_dict(
-    torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
-)
-model.to(DEVICE)
-model.eval()
-print("Model loaded. Device:", DEVICE)
+MODEL = build_model(resolve_model_path())
 
-# ── PREPROCESSING ────────────────────────────────────────────
-# Same as val_test_tf used during training
+# ── Transform ─────────────────────────────────────────────────────────────────
 transform = transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
+    transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std =[0.229, 0.224, 0.225]
-    )
+    transforms.Normalize([0.485, 0.456, 0.406],
+                         [0.229, 0.224, 0.225]),
 ])
 
-# Class mapping — Big=0, Small=1 (alphabetical, same as ImageFolder)
-IDX_TO_CLASS = {0: "BIG LEAF", 1: "SMALL LEAF"}
+CLASS_NAMES = {0: "Big Leaf 🌿", 1: "Small Leaf 🌱"}
 
-# ── PREDICTION FUNCTION ──────────────────────────────────────
-# Gradio passes a PIL Image directly
-def predict(pil_image):
-
-    if pil_image is None:
-        return "No image uploaded.", {}
-
-    # Preprocess
-    img    = pil_image.convert("RGB")
-    tensor = transform(img).unsqueeze(0).to(DEVICE)
-
-    # Inference
+# ── Inference ─────────────────────────────────────────────────────────────────
+def predict(image: Image.Image):
+    tensor = transform(image).unsqueeze(0)
     with torch.no_grad():
-        logit      = model(tensor)
-        prob_small = torch.sigmoid(logit).item()   # probability of SMALL LEAF
+        logit = MODEL(tensor)[0, 0].item()
+    prob = torch.sigmoid(torch.tensor(logit)).item()
+    big_conf   = round((1 - prob) * 100, 1)
+    small_conf = round(prob * 100, 1)
+    label = CLASS_NAMES[1 if prob >= 0.5 else 0]
+    return label, {"Big Leaf": big_conf, "Small Leaf": small_conf}
 
-    prob_big = 1.0 - prob_small
+# ── Gradio UI ─────────────────────────────────────────────────────────────────
+app = gr.Interface(
+    fn=predict,
+    inputs=gr.Image(type="pil", label="Upload Spinach Leaf Image"),
+    outputs=[
+        gr.Text(label="Prediction"),
+        gr.Label(label="Confidence"),
+    ],
+    title="Spinach Leaf Classifier 🌿",
+    description="Upload a spinach leaf image to classify it as Big or Small.",
+    allow_flagging="never",
+)
 
-    predicted_idx   = int(prob_small >= 0.5)
-    predicted_class = IDX_TO_CLASS[predicted_idx]
-    confidence      = prob_small if predicted_idx == 1 else prob_big
-
-    # Gradio label output expects {"class_name": probability, ...}
-    label_output = {
-        "BIG LEAF":   round(prob_big,   4),
-        "SMALL LEAF": round(prob_small, 4)
-    }
-
-    result_text = (
-        f"Predicted  : {predicted_class}\n"
-        f"Confidence : {confidence*100:.2f}%\n"
-        f"Big Leaf   : {prob_big*100:.2f}%\n"
-        f"Small Leaf : {prob_small*100:.2f}%"
-    )
-
-    return result_text, label_output
-
-
-# ── GRADIO INTERFACE ─────────────────────────────────────────
-with gr.Blocks(title="Spinach Leaf Classifier", theme=gr.themes.Default()) as app:
-
-    # Header
-    gr.Markdown(
-        """
-        # 🌿 Spinach Leaf Classifier
-        **Model:** MobileNetV2 (Transfer Learning)
-        **Task:** Classify spinach leaf as **BIG LEAF** or **SMALL LEAF**
-
-        Upload any spinach leaf image — works on phone and PC.
-        """
-    )
-
-    with gr.Row():
-
-        # Left column — input
-        with gr.Column():
-            image_input = gr.Image(
-                type="pil",
-                label="Upload Spinach Leaf Image",
-                height=300
-            )
-            classify_btn = gr.Button(
-                "🔍 Classify Leaf",
-                variant="primary",
-                size="lg"
-            )
-
-        # Right column — output
-        with gr.Column():
-            text_output  = gr.Textbox(
-                label="Prediction Result",
-                lines=5,
-                interactive=False
-            )
-            label_output = gr.Label(
-                label="Class Probabilities",
-                num_top_classes=2
-            )
-
-    # Examples section — optional, add your own leaf image paths
-    gr.Examples(
-        examples=[],           # add example image paths here if you have them
-        inputs=image_input,
-        label="Example Images"
-    )
-
-    gr.Markdown(
-        """
-        ---
-        **How to use:**
-        1. Click **Upload Spinach Leaf Image** or drag and drop
-        2. Click **Classify Leaf**
-        3. See prediction and confidence scores
-
-        *Developed at IIITDM Kurnool — Applied AI Research*
-        """
-    )
-
-    # Wire button to predict function
-    classify_btn.click(
-        fn      = predict,
-        inputs  = [image_input],
-        outputs = [text_output, label_output]
-    )
-
-    # Also trigger on image upload automatically
-    image_input.change(
-        fn      = predict,
-        inputs  = [image_input],
-        outputs = [text_output, label_output]
-    )
-
-
-# ── LAUNCH ───────────────────────────────────────────────────
 if __name__ == "__main__":
     app.launch(
-        share=True,       # ← generates public link anyone can open
-        show_error=True
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=False,
     )
-    # share=True prints something like:
-    # Running on public URL: https://xxxxxxxxxxxx.gradio.live
-    # This link is valid for 72 hours.
-    # Share it with anyone — works on mobile browser too.
