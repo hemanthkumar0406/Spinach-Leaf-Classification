@@ -1,0 +1,42 @@
+# ===== Large datasets - never commit =====
+dataset/
+data/
+images/
+cropped/
+augmented/
+model_ready/
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tif
+*.tiff
+
+# ===== Model checkpoints - use Git LFS or HF Hub =====
+models/
+results/previous/
+*.pth
+*.pt
+*.h5
+*.pkl
+*.onnx
+
+# ===== Gradio runtime cache =====
+.gradio/
+flagged/
+
+# ===== Python =====
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+venv/
+.venv/
+env/
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
