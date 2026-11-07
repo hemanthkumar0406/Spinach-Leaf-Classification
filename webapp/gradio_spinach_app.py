@@ -8,7 +8,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 from torchvision import models
 
-# ── Model resolution ──────────────────────────────────────────────────────────
+
 def resolve_model_path() -> Path:
     env = os.environ.get("MODEL_PATH")
     if env and Path(env).exists():
@@ -26,13 +26,14 @@ def resolve_model_path() -> Path:
     except Exception as e:
         raise FileNotFoundError(f"Model not found: {e}")
 
-# ── Build model ───────────────────────────────────────────────────────────────
+
 def build_model(path: Path) -> torch.nn.Module:
     model = models.mobilenet_v2(weights=None)
     model.classifier = torch.nn.Sequential(
         torch.nn.Dropout(0.2),
         torch.nn.Linear(1280, 256),
         torch.nn.ReLU(),
+        torch.nn.Dropout(0.2),
         torch.nn.Linear(256, 1),
     )
     state = torch.load(path, map_location="cpu")
@@ -40,9 +41,9 @@ def build_model(path: Path) -> torch.nn.Module:
     model.eval()
     return model
 
+
 MODEL = build_model(resolve_model_path())
 
-# ── Transform ─────────────────────────────────────────────────────────────────
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -52,7 +53,7 @@ transform = transforms.Compose([
 
 CLASS_NAMES = {0: "Big Leaf 🌿", 1: "Small Leaf 🌱"}
 
-# ── Inference ─────────────────────────────────────────────────────────────────
+
 def predict(image: Image.Image):
     tensor = transform(image).unsqueeze(0)
     with torch.no_grad():
@@ -63,7 +64,7 @@ def predict(image: Image.Image):
     label = CLASS_NAMES[1 if prob >= 0.5 else 0]
     return label, {"Big Leaf": big_conf, "Small Leaf": small_conf}
 
-# ── Gradio UI ─────────────────────────────────────────────────────────────────
+
 app = gr.Interface(
     fn=predict,
     inputs=gr.Image(type="pil", label="Upload Spinach Leaf Image"),
@@ -73,12 +74,11 @@ app = gr.Interface(
     ],
     title="Spinach Leaf Classifier 🌿",
     description="Upload a spinach leaf image to classify it as Big or Small.",
-    allow_flagging="never",
 )
 
 if __name__ == "__main__":
     app.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        share=False,
+        share=True,
     )

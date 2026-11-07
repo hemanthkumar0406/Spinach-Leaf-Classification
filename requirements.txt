@@ -1,6 +1,25 @@
-torch>=2.1.0
-torchvision>=0.16.0
-gradio>=4.0.0
-pillow>=10.0.0
-numpy>=1.24.0
-huggingface_hub>=0.20.0
+
+---
+
+## ⚙️ Run Locally
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/hemanthkumar0406/Spinach-Leaf-Classification.git
+cd Spinach-Leaf-Classification
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Place model checkpoint
+# Copy mobilenet_best.pth into models/ folder
+
+# 4. Run the app
+python app.py
+
+# 5. Open browser
+# http://127.0.0.1:7860
+```
+
+---
+
