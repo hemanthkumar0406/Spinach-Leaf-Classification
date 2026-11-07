@@ -26,6 +26,14 @@ pip install -r requirements.txt
 python app.py
 ```
 
+Then open browser: http://localhost:7860
+
+## Run Gradio app directly
+```bash
+cd webapp
+python gradio_spinach_app.py
+```
+
 ## Dataset Download
 
 The complete Spinach Leaf Classification dataset is available on Google Drive.
