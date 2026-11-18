@@ -8,16 +8,15 @@ augmented/
 model_ready/
 *.jpg
 *.jpeg
-*.png
+dataset/**/*.png
+dataset/**/*.jpg
+dataset/**/*.jpeg
 *.bmp
 *.tif
 *.tiff
 
 # ===== Model checkpoints - use Git LFS or HF Hub =====
-models/
-results/previous/
-*.pth
-*.pt
+results/
 *.h5
 *.pkl
 *.onnx
